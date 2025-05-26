@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>MOV → MP4 Converter</title>
+  <style>
+    body {font-family:sans-serif;display:flex;flex-direction:column;align-items:center;margin-top:40px}
+    #drop {border:2px dashed #999;padding:40px 60px;border-radius:8px;text-align:center}
+    progress {width:300px;margin-top:20px}
+  </style>
+</head>
+<body>
+  <h1>Drag & Drop: .mov → .mp4</h1>
+  <div id="drop">ここに動画をドロップ</div>
+  <progress id="bar" value="0" max="100" hidden></progress>
+  <script type="module">
+    import { createFFmpeg, fetchFile } from "https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js";
+    const ffmpeg = createFFmpeg({ log: true });
+    const drop = document.getElementById("drop");
+    const bar  = document.getElementById("bar");
+
+    drop.ondragover = e => (e.preventDefault(), drop.style.borderColor="#0a0");
+    drop.ondragleave = () => drop.style.borderColor="#999";
+    drop.ondrop = async e => {
+      e.preventDefault();
+      drop.style.borderColor="#999";
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      bar.hidden = false; bar.value = 0;
+
+      if (!ffmpeg.isLoaded()) await ffmpeg.load();
+
+      ffmpeg.FS("writeFile", "in.mov", await fetchFile(file));
+      await ffmpeg.run("-i", "in.mov", "-c:v", "libx264", "-preset", "fast",
+                       "-c:a", "aac", "-movflags", "faststart", "out.mp4",
+                       "-progress", "pipe:1");
+      const data = ffmpeg.FS("readFile", "out.mp4");
+      const url  = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
+      const a = Object.assign(document.createElement("a"), { href:url, download:`${file.name}.mp4` });
+      a.click(); URL.revokeObjectURL(url);
+      bar.hidden = true;
+    };
+  </script>
+</body>
+</html>
